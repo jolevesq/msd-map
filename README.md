@@ -1,2 +1,3 @@
 # msd-map
-Conversion of msd file to mapServer map file
+
+Conversion of ESRI msd file to MapServer map file.
