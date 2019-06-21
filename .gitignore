@@ -1,0 +1,5 @@
+src/*.pyc
+src/common/*.pyc
+src/symbols/*.pyc
+
+.vscode/
