@@ -1,3 +1,6 @@
+# needed to keep order before Python 3.7
+from collections import OrderedDict
+
 # import msd - map modules
 import utils
 import polygonSymbols
@@ -11,48 +14,35 @@ def manageSymbols(styles):
     for style in styles:
         styleType = style.attrib.itervalues().next()
 
+        # get rotation, offset and size. There for all CIMSymbolLayer
+        values = OrderedDict()
+        values['SYMBOL'] = 'tmp'
+        values['ANGLE'] = style.findtext('./Rotation')
+        values['OFFSET'] = style.findtext('./OffsetX') + ' ' + style.findtext('./OffsetY')
+        values['SIZE'] = style.findtext('./Size')
+
         # circle
         if 'CIMSimpleMarker' in styleType:
-            color = utils.getColor(style.find('./OutlineColor'))
-            width = style.find('./OutlineWidth').text
-            fill = utils.getColor(style.find('./FillColor'))
-            size = style.find('./Size').text
-
-            stylesString += getSimpleMarker('circle', color, width, fill, size)
+            values['OUTLINECOLOR'] = utils.getColor(style.find('./OutlineColor'))
+            values['WIDTH'] = style.findtext('./OutlineWidth')
+            values['COLOR'] = utils.getColor(style.find('./FillColor'))
+            values['SIZE'] = style.findtext('./Size')
+            values['SYMBOL'] = 'circle'
+            stylesString += utils.createStyle(values)
 
         elif 'CIMCharacterMarker' in styleType:
-            stylesString += manageCharacterMarkerSymbol(style)
+            stylesString += manageCharacterMarkerSymbol(style, values)
 
         # square, cross, x, diamond
         elif 'CIMVectorMarker' in styleType:
-            stylesString += manageVectorMarker(style)
+            stylesString += manageVectorMarker(style, values)
 
 
     return stylesString
 
-def getSimpleMarker(marker, color, width, fill, size):
-    style = """        STYLE
-            SYMBOL       "{marker}"
-            COLOR       {fill}
-            OUTLINECOLOR {color}
-            WIDTH       {width}
-            SIZE       {size}
-        END # style\n""".format(marker=marker, color=color, width=width, fill=fill, size=size)
-
-    return style
-
-def getSimpleMarkerLight(marker, color, size):
-    style = """        STYLE
-            SYMBOL       "{marker}"
-            COLOR       {color}
-            SIZE       {size}
-        END # style\n""".format(marker=marker, color=color, size=size)
-
-    return style
-
-def manageCharacterMarkerSymbol(root):
+def manageCharacterMarkerSymbol(root, values):
     # get marker symbol
-    name = utils.incrementName('marker')
+    values['SYMBOL'] = utils.incrementName('marker')
     font = lookup.getFontfromESRI(root.find('./FontFamilyName').text)
 
     # escape "
@@ -63,17 +53,15 @@ def manageCharacterMarkerSymbol(root):
         char = chr(code) # get character from ASCII
  
     # add symbols to array of symbols
-    utils.addSymbol(getCharacterMarkerSymbol(name, font, char))
-
-    # marker size to use in style
-    size = root.find('./Size').text
+    utils.addSymbol(getCharacterMarkerSymbol(values['SYMBOL'], font, char))
 
     # only support one level deep
     # TODO: check if we need to support more...
     styleNode = root.find('./Symbol/SymbolLayers/CIMSymbolLayer')
 
     if 'CIMFill' in styleNode.attrib.itervalues().next():
-        style = getFillMarkerStyle(styleNode, name, size)
+        values['COLOR'] = utils.getColor(styleNode.find('./Pattern/Color'))
+        style = utils.createStyle(values, ['SYMBOL', 'COLOR', 'SIZE'])
     else:
         print 'NOT SUPPORTED'
 
@@ -90,28 +78,17 @@ def getCharacterMarkerSymbol(name, font, char):
 
     return symbol
 
-def getFillMarkerStyle(root, name, size):
-    color = utils.getColor(root.find('./Pattern/Color')) 
-    style = """        STYLE
-            SYMBOL "{name}"
-            COLOR {color}
-            SIZE {size}
-        END # style {name}\n""".format(name=name, color=color, size=size)
-
-    return style
-
-def manageVectorMarker(node):
+def manageVectorMarker(node, values):
     # there is 3 kind of vector marker.... for the moment
     # square doesn't have path node, only envelope
     # cross and x have PathArray node
     # diamond have RingArray node
-    size = node.find('./Size').text
     styles = node.findall('./MarkerGraphics/CIMMarkerGraphic/Symbol/SymbolLayers/CIMSymbolLayer')
 
     styles.reverse()
     if node.find('./MarkerGraphics/CIMMarkerGraphic/Geometry/PathArray') != None:
 
-        name = utils.getPathSymbol(node.findall('./MarkerGraphics/CIMMarkerGraphic/Geometry/PathArray/Path'))
+        values['SYMBOL'] = utils.getPathSymbol(node.findall('./MarkerGraphics/CIMMarkerGraphic/Geometry/PathArray/Path'))
 
         # there is only CIMFilledStroke symbol. If we need outline, fill will have a width of -1
         # if no outline, there is only one CIMFilledStroke with width -1
@@ -119,16 +96,16 @@ def manageVectorMarker(node):
         styleString = ''
         for item in styles:
             if item.find('./Width').text == '-1':
-                fill = utils.getColor(item.find('./Pattern/Color'))
-                styleString += getSimpleMarkerLight(name, fill, size)
+                values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
+                styleString += utils.createStyle(values, ['SYMBOL', 'COLOR', 'SIZE', 'ANGLE'])
             else:
-                color = utils.getColor(item.find('./Pattern/Color'))
-                width = item.find('./Width').text
-                styleString += getSimpleMarkerLight(name, color, float(size) + float(width))
+                values['OUTLINECOLOR'] = utils.getColor(item.find('./Pattern/Color'))
+                values['SIZE'] = float(item.findtext('./Width')) + float(values['SIZE'])
+                styleString += utils.createStyle(values, ['SYMBOL', 'OUTLINECOLOR', 'SIZE'])
 
     elif node.find('./MarkerGraphics/CIMMarkerGraphic/Geometry/RingArray') != None:
         
-        name = utils.getRingSymbol(node.findall('./MarkerGraphics/CIMMarkerGraphic/Geometry/RingArray/Ring/PointArray/Point'))
+        values['SYMBOL'] = utils.getRingSymbol(node.findall('./MarkerGraphics/CIMMarkerGraphic/Geometry/RingArray/Ring/PointArray/Point'))
         
         # Put back styles in first order. Seems to be the right one for ringArray
         styles.reverse()
@@ -141,25 +118,26 @@ def manageVectorMarker(node):
             styleType = item.attrib.itervalues().next()
 
             if 'CIMFilledStroke' in styleType:
-                color = utils.getColor(item.find('./Pattern/Color'))
-                width = item.find('./Width').text
-                styleString += getSimpleMarkerLight(name, color, float(size) + float(width))
+                values['OUTLINECOLOR'] = utils.getColor(item.find('./Pattern/Color'))
+                values['SIZE'] = float(item.findtext('./Width')) + float(values['SIZE'])
+                styleString += utils.createStyle(values, ['SYMBOL', 'OUTLINECOLOR', 'SIZE'])
             elif 'CIMFill' in styleType:
-                fill = utils.getColor(item.find('./Pattern/Color'))
-                styleString += getSimpleMarkerLight(name, fill, size)
+                values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
+                styleString += utils.createStyle(values, ['SYMBOL', 'COLOR', 'SIZE', 'ANGLE'])
 
     else:
         for item in styles:
             styleType = item.attrib.itervalues().next()
-            
+
             if 'CIMFilledStroke' in styleType:
-                color = utils.getColor(item.find('./Pattern/Color'))
-                width = item.find('./Width').text
+                values['OUTLINECOLOR'] = utils.getColor(item.find('./Pattern/Color'))
+                values['WIDTH'] = item.findtext('./Width')
             #: TODO: CIMFill has no width. works the same as point, line polygon
             elif 'CIMFill' in styleType:
-                fill = utils.getColor(item.find('./Pattern/Color'))
+                values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
 
-        styleString = getSimpleMarker('square', color, width, fill, size)
+        values['SYMBOL'] = 'square'
+        styleString = utils.createStyle(values)
 
     return styleString
 

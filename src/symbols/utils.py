@@ -67,7 +67,28 @@ def convertBase64(node, name):
     im = Image.open(BytesIO(base64.b64decode(data)))
     im.save(name + '.png', 'PNG')
 
-def createSymbol(nameType, geom):
+def createStyle(values, fields = []):
+    # iterate over key pair
+    keys = ''
+    for key, value in values.items():
+
+        # if an array of keys to add is provided, check if the key is part of it
+        if len(fields) == 0 or key in fields:
+            if key == 'SYMBOL':
+                value = '"' + value + '"'
+
+            keys += '            ' + key + '         ' + str(value) + '\n'
+
+    # remove last carriage return
+    keys = keys.rstrip()
+
+    style = """        STYLE
+{keys}
+        END # style\n""".format(keys=keys)
+
+    return style
+
+def createSymbol(nameType, geom, filled):
     # there seems to be a limit of points in MapServer for a symbol
     if ((len(geom.split(' ')) / 2) < 10):
         name = incrementName(nameType)
@@ -76,8 +97,8 @@ def createSymbol(nameType, geom):
             NAME "{name}"
             TYPE vector
             POINTS {geom} END
-            FILLED true
-    END # symbol {name}""".format(name=name, geom=geom)
+            FILLED {filled}
+    END # symbol {name}""".format(name=name, geom=geom, filled=filled)
 
         # add symbols to array of symbols
         addSymbol(symbol)
@@ -90,7 +111,7 @@ def createSymbol(nameType, geom):
 def getRingSymbol(points):
     geom = addPointGeom(points)
 
-    return createSymbol('ring', geom)
+    return createSymbol('ring', geom, 'true')
 
 def getPathSymbol(paths):
     geom = ''
@@ -102,7 +123,7 @@ def getPathSymbol(paths):
         # change path, add -99 -99
         geom += '-99 -99 '
 
-    return createSymbol('path', geom)
+    return createSymbol('path', geom, 'false')
 
 def addPointGeom(points):
 

@@ -109,3 +109,13 @@ We can have both inside a map file.
 * CIMFill
     * CIMTiledPattern (need URL)
     * COLOR: There is color but is it needed?
+
+
+# Values from styles
+
+* CIMSolidPattern
+    * Color
+    * Width
+
+* CIMFIll
+    * Color
