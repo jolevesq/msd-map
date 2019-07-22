@@ -2,4 +2,6 @@ src/*.pyc
 src/common/*.pyc
 src/symbols/*.pyc
 
+MXD2map
+
 .vscode/
