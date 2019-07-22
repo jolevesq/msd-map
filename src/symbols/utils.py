@@ -6,6 +6,9 @@ import base64
 from PIL import Image
 from io import BytesIO
 
+# import msd - map modules
+from common import sections
+
 # array to hold all symbols to add to map file
 symbols = []
 
@@ -13,19 +16,49 @@ symbols = []
 incName = 0
 
 def getSymbols():
+    """
+    Get array of symbols
+
+    Returns:
+        symbols: The array of symbols
+    """
     return symbols
 
-# TODO: create a dictionnay of symbols ad check if the symbol exist, if so, reference it instead of creating it
+# TODO: create a dictionnay of symbols and check if the symbol exist, if so, reference it instead of creating it
 def addSymbol(symbol):
+    """
+    Add a symbol to the array of symbols
+
+    Args:
+        symbol: The symbol to add
+    """
     symbols.append(symbol)
 
 def incrementName(name):
+    """
+    Increment and return a unique symbol name
+
+    Args:
+        name: The symbol name from symbol type (e.g. path, hatch, ring, ...)
+
+    Returns:
+        The unique name
+    """
     global incName
     incName += 1
 
     return "{name}-{incName}".format(name=name, incName=incName)
 
 def getColor(node):
+    """
+    Get RGB color from color node
+
+    Args:
+        node: The xml color node
+
+    Returns:
+        color: The RGB color
+    """
     if node != None:
         colorType = node.attrib.itervalues().next()
 
@@ -63,11 +96,28 @@ def getColor(node):
     return str(R) + ' ' + str(G) + ' ' + str(B)
 
 def convertBase64(node, name):
-    data = node.find('./Pattern/URL').text.split('base64,')[1]
+    """
+    Convert a base64 image to a png
+
+    Args:
+        node: The xml url node
+        name: The name of the output file
+    """
+    data = node.findtext('./URL').split('base64,')[1]
     im = Image.open(BytesIO(base64.b64decode(data)))
     im.save(name + '.png', 'PNG')
 
 def createStyle(values, fields = []):
+    """
+    Create the style section from dictionnary of values/keys
+
+    Args:
+        values: Dictionnary of values
+        fields: The array of values to add from the dictionnary keys (optional, default empty. If empty, use all values)
+
+    Returns:
+        style: The style section
+    """
     # iterate over key pair
     keys = ''
     for key, value in values.items():
@@ -88,17 +138,56 @@ def createStyle(values, fields = []):
 
     return style
 
-def createSymbol(nameType, geom, filled):
+def createPictureSymbol(node):
+    """
+    Create picture symbol
+
+    Args:
+        node: The xml symbol node
+
+    Returns:
+        name: The name to use in the symbol value of style section
+    """
+    folder = sections.getProjectFolderName()
+    name = incrementName('picture')
+
+    # convert to png
+    convertBase64(node, name)
+
+    symbol = """SYMBOL
+    NAME        "{name}"
+    TYPE        pixmap
+    IMAGE       "data/{folder}/img/{name}.png"
+  END # symbol {name}""".format(name=name, folder=folder)
+
+    # add symbols to array of symbols
+    addSymbol(symbol)
+
+    return name
+
+def createVectorSymbol(nameType, geom, filled):
+    """
+    Create vector symbol
+
+    Args:
+        nameType: The name type to increment to get the unique symbol value
+        geom: The vector geometry as a list of coordinates
+        filled: The filled value for the symbol (true or false)
+
+    Returns:
+        name: The name to use in the symbol value of style section
+    """
     # there seems to be a limit of points in MapServer for a symbol
-    if ((len(geom.split(' ')) / 2) < 10):
+    # if values exceed the limit, use a circle symbol instead
+    if ((len(geom.split(' ')) / 2) < 20):
         name = incrementName(nameType)
 
         symbol = """SYMBOL
-            NAME "{name}"
-            TYPE vector
-            POINTS {geom} END
-            FILLED {filled}
-    END # symbol {name}""".format(name=name, geom=geom, filled=filled)
+    NAME        "{name}"
+    TYPE        vector
+    POINTS      {geom} END
+    FILLED      {filled}
+  END # symbol {name}""".format(name=name, geom=geom, filled=filled)
 
         # add symbols to array of symbols
         addSymbol(symbol)
@@ -109,11 +198,29 @@ def createSymbol(nameType, geom, filled):
     return name
 
 def getRingSymbol(points):
+    """
+    Create vector symbol of type ring
+
+    Args:
+        points: The list of coordinates
+
+    Returns:
+        name: The name to use in the symbol value of style section
+    """
     geom = addPointGeom(points)
 
-    return createSymbol('ring', geom, 'true')
+    return createVectorSymbol('ring', geom, 'true')
 
 def getPathSymbol(paths):
+    """
+    Create vector symbol of type path
+
+    Args:
+        paths: The list of paths who contains coordinates
+
+    Returns:
+        name: The name to use in the symbol value of style section
+    """
     geom = ''
     for path in paths:
         points = path.findall('./PointArray/Point')
@@ -123,17 +230,26 @@ def getPathSymbol(paths):
         # change path, add -99 -99
         geom += '-99 -99 '
 
-    return createSymbol('path', geom, 'false')
+    return createVectorSymbol('path', geom, 'false')
 
 def addPointGeom(points):
+    """
+    Create the list of points of a path or ring symbol
 
+    Args:
+        points: The list of coordinates
+
+    Returns:
+        geom: The symbol geometry as a list of points
+    """
     xOld = ''
     yOld = ''
     geom = ''
     for point in points:
         x = str(round(float(point.findtext('./X')), 2))
         y = str(round(float(point.findtext('./Y')), 2))
-            
+        
+        # if value is not identical as a old point, add it
         if (x != xOld or y != yOld):
             geom += x + ' ' + y + ' '
 

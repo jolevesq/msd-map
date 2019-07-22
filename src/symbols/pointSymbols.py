@@ -3,11 +3,20 @@ from collections import OrderedDict
 
 # import msd - map modules
 import utils
-import polygonSymbols
 from common import lookup
 from common import sections
 
-def manageSymbols(styles):
+def manageSymbols(styles, values = OrderedDict()):
+    """
+    Create style for point layer
+
+    Args:
+        styles: The array of styles xml node
+        values: The dictionnary of values to add (optional, default empty dictionnary)
+
+    Returns:
+        styleString: The layer's style section
+    """
     stylesString = ''
     styles.reverse()
 
@@ -15,7 +24,6 @@ def manageSymbols(styles):
         styleType = style.attrib.itervalues().next()
 
         # get rotation, offset and size. There for all CIMSymbolLayer
-        values = OrderedDict()
         values['SYMBOL'] = 'tmp'
         values['ANGLE'] = style.findtext('./Rotation')
         values['OFFSET'] = style.findtext('./OffsetX') + ' ' + style.findtext('./OffsetY')
@@ -37,10 +45,24 @@ def manageSymbols(styles):
         elif 'CIMVectorMarker' in styleType:
             stylesString += manageVectorMarker(style, values)
 
+        elif 'CIMPictureMarker' in styleType:
+            name = utils.createPictureSymbol(style)
+            values['SYMBOL'] = name
+            stylesString += utils.createStyle(values)
 
     return stylesString
 
 def manageCharacterMarkerSymbol(root, values):
+    """
+    Create character marker style for point layer
+
+    Args:
+        root: The styles xml node
+        values: The dictionnary of values to add (optional, default empty dictionnary)
+
+    Returns:
+        style: The layer's style section
+    """
     # get marker symbol
     values['SYMBOL'] = utils.incrementName('marker')
     font = lookup.getFontfromESRI(root.find('./FontFamilyName').text)
@@ -58,17 +80,28 @@ def manageCharacterMarkerSymbol(root, values):
     # only support one level deep
     # TODO: check if we need to support more...
     styleNode = root.find('./Symbol/SymbolLayers/CIMSymbolLayer')
-
-    if 'CIMFill' in styleNode.attrib.itervalues().next():
+    styleType = styleNode.attrib.itervalues().next()
+    if 'CIMFill' in styleType:
         values['COLOR'] = utils.getColor(styleNode.find('./Pattern/Color'))
-        style = utils.createStyle(values, ['SYMBOL', 'COLOR', 'SIZE'])
+        style = utils.createStyle(values)
     else:
-        print 'NOT SUPPORTED'
+        print styleType + ' is not supported for point layer'
 
     return style
 
     
 def getCharacterMarkerSymbol(name, font, char):
+    """
+    Create character marker symbol
+
+    Args:
+        name: The symbol name
+        font: The symbol font
+        char: the character to use
+
+    Returns:
+        symbol: The character marker symbol
+    """
     symbol = """SYMBOL
     NAME        "{name}"
     TYPE        truetype
@@ -79,6 +112,16 @@ def getCharacterMarkerSymbol(name, font, char):
     return symbol
 
 def manageVectorMarker(node, values):
+    """
+    Create vector marker style for point layer
+
+    Args:
+        node: The style xml node
+        values: The dictionnary of values to add (optional, default empty dictionnary)
+
+    Returns:
+        styleString: The vector marker symbol
+    """
     # there is 3 kind of vector marker.... for the moment
     # square doesn't have path node, only envelope
     # cross and x have PathArray node

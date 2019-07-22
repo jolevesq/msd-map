@@ -1,83 +1,95 @@
+# needed to keep order before Python 3.7
+from collections import OrderedDict
+
 # import msd - map modules
 import utils
+import pointSymbols
+import lineSymbols
 from common import lookup
 from common import sections
 
 def manageSymbols(styles):
+    """
+    Create style for polygon layer
+
+    Args:
+        styles: The array of styles xml node
+
+    Returns:
+        styleString: The layer's style section
+    """
     stylesString = ''
     styles.reverse()
 
-    for style in styles:
-        styleType = style.attrib.itervalues().next()
+    values = OrderedDict()
+    for item in styles:
+        styleType = item.attrib.itervalues().next()
 
         if 'CIMFilledStroke' in styleType:
-            stylesString += getFilledStroke(style) + '\n'
+            values['OUTLINECOLOR'] = utils.getColor(item.find('./Pattern/Color'))
+            values['WIDTH'] = item.findtext('./Width')
+            
+            stylesString += utils.createStyle(values, ['OUTLINECOLOR', 'WIDTH'])
         elif 'CIMFill' in styleType:
-            stylesString += getFill(style) + '\n'
+            stylesString += getFill(item, values)
 
     return stylesString
 
-def getFilledStroke(node):
+def getFill(node, values):
+    """
+    Create fill pattern
 
-    # get info
-    color = utils.getColor(node.find('./Pattern/Color'))
-    width = node.find('./Width').text
+    Args:
+        node: The styles xml node
+        values: The dictionnary of values to add (optional, default empty dictionnary)
 
-    style = """        STYLE
-            OUTLINECOLOR       {color}
-            WIDTH       {width}
-        END # style""".format(color=color, width=width)
-
-    return style
-
-def getFill(node):
-
+    Returns:
+        style: The layer's fill
+    """
     # check fill pattern
+    style = ''
     pattern = node.find('./Pattern').attrib.itervalues().next()
 
     if 'CIMSolidPattern' in pattern:
-        # get info
-        fill = utils.getColor(node.find('./Pattern/Color'))
-
-        # if fill is not define, it means there no color fill. Set it as white
-        if 'fill' not in locals():
-            fill = '255 255 255'
-
-        style = """        STYLE
-                COLOR       {fill}
-            END # style""".format(fill=fill)
+        values['COLOR'] = utils.getColor(node.find('./Pattern/Color'))
+        style = utils.createStyle(values, ['COLOR'])
 
     elif 'CIMTiledPattern' in pattern:
-        name = utils.incrementName('picture')
-        # add symbols to array of symbols
-        utils.addSymbol(getFillPictureSymbol(name))
-        utils.convertBase64(node, name)
-
-        style = """        STYLE
-            SYMBOL       "{name}"
-        END # style""".format(name=name)
+        name = utils.createPictureSymbol(node.find('./Pattern'))
+        values['SYMBOL'] = name
+        style = utils.createStyle(values)   
 
     elif 'CIMMarkerPattern' in pattern:
-        style = ''
+        values['GAP'] = node.findtext('./Pattern/MarkerPlacement/StepX')
+        style = pointSymbols.manageSymbols(node.findall('./Pattern/Symbol/SymbolLayers/CIMSymbolLayer'), values)
 
     elif 'CIMHatchPattern' in pattern:
         style = ''
+        size = float(node.findtext('./Pattern/Separation'))
+        
+        # find symbol to use from rotation. For size, double value when not horizontal
+        deg = round(float(node.findtext('./Pattern/Rotation')) / 45) * 45
+        if deg in [0, 180]:
+            name = 'hatch-0'
+        elif deg in [90, 270]:
+            name = 'hatch-90'
+            size += size
+        elif deg in [45, 225]:
+            name = 'hatch-45'
+            size += size
+        elif deg in [135, 315]:
+            name = 'hatch-135'
+            size += size
 
-    elif  'CIMGradientPattern' in pattern:
-        style = ''
+        values['SYMBOL'] = name
+        values['SIZE'] = size
+        fields = ['SYMBOL', 'SIZE']
+        style = lineSymbols.manageSymbols(node.findall('./Pattern/LineSymbol/SymbolLayers/CIMSymbolLayer'), values, fields)
 
-    else: 
-        style = pattern
+    elif 'CIMGradientPattern' in pattern:
+        print 'CIMGradientPattern not supported for polygon layer'
+
+    else:
+        print pattern + ' is not supported for polygon layer'
 
     return style
-
-def getFillPictureSymbol(name):
-    folder = sections.getProjectFolderName()
-
-    symbol = """SYMBOL
-    NAME        "{name}"
-    TYPE        pixmap
-    IMAGE       "data/{folder}/img/{name}.png"
-  END # symbol {name}""".format(name=name, folder=folder)
-
-    return symbol

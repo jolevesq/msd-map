@@ -5,6 +5,19 @@ import lineSymbols as ln
 import polygonSymbols as pl
 
 def getSymbology(root, geom):
+    """
+    Get layer's style section. We support 3 type of symbolizer for now
+        - Simple
+        - Unique value
+        - Class break
+
+    Args:
+        root: The xml symbology root node
+        geom: The datataset geometry (Point, Line or Polygon)
+
+    Returns:
+        styleStrings: The styles for the layer
+    """
     symbType = root.find('./Symbolizer').attrib.itervalues().next()
 
     if 'CIMSimpleSymbolizer' in symbType:
@@ -18,14 +31,14 @@ def getSymbology(root, geom):
 
     elif 'CIMUniqueValueSymbolizer' in symbType:
         # get the field to render from
-        stylesString = 'CLASSITEM          "' + root.find('./Symbolizer/Fields/String').text + '"\n'
+        stylesString = 'CLASSITEM          "' + root.findtext('./Symbolizer/Fields/String') + '"\n'
 
         # get array of symbol class
         classes = root.findall('./Symbolizer/Groups/CIMUniqueValueGroup/Classes/CIMUniqueValueClass')
 
         for elem in classes:
             # get the expression for the class
-            value = elem.find('./Values/CIMUniqueValue/FieldValues/String').text
+            value = elem.findtext('./Values/CIMUniqueValue/FieldValues/String')
             stylesString += '    CLASS\n'
             stylesString += '        EXPRESSION   "' + value + '"\n'
             
@@ -37,16 +50,16 @@ def getSymbology(root, geom):
 
     elif 'CIMClassBreaksSymbolizer' in symbType:
         # get the field to render from
-        field = root.find('./Symbolizer/Field').text
+        field = root.findtext('./Symbolizer/Field')
         stylesString = 'CLASSITEM          "' + field + '"\n'
-        minimumBreak = root.find('./Symbolizer/MinimumBreak').text
+        minimumBreak = root.findtext('./Symbolizer/MinimumBreak')
 
         # get array of symbol class
         classes = root.findall('./Symbolizer/Breaks/CIMClassBreak')
 
         for elem in classes:
             # get the expression for the class
-            value = elem.find('./UpperBound').text
+            value = elem.findtext('./UpperBound')
             stylesString += '    CLASS\n'
             stylesString += '        EXPRESSION   ([' + field + ']>=' + minimumBreak + ' AND [' + field + ']<' + value + ')\n'
             
@@ -58,9 +71,20 @@ def getSymbology(root, geom):
 
             stylesString += '    END # class ' + value + '\n'
 
-    return stylesString
+     # remove last carriage return
+    return stylesString.rstrip()
 
 def getStyle(styles, geom):
+    """
+    Get Get the styles in function of the geometry
+
+    Args:
+        styles: The xml styles nodes
+        geom: The datataset geometry (Point, Line or Polygon)
+
+    Returns:
+        styleStrings: The styles for the layer
+    """
     if geom == 'Point':
         stylesString = pt.manageSymbols(styles)
     elif geom == 'Line':
