@@ -3,6 +3,7 @@ from common import lookup
 import pointSymbols as pt
 import lineSymbols as ln
 import polygonSymbols as pl
+from common import trace
 
 def getSymbology(root, geom):
     """
@@ -21,6 +22,7 @@ def getSymbology(root, geom):
     symbType = root.find('./Symbolizer').attrib.itervalues().next()
 
     if 'CIMSimpleSymbolizer' in symbType:
+        trace.log('Add CIMSimpleSymbolizer')
         stylesString = 'CLASS\n'
 
         # get array of symbols
@@ -30,6 +32,8 @@ def getSymbology(root, geom):
         stylesString += '    END # class\n'
 
     elif 'CIMUniqueValueSymbolizer' in symbType:
+        trace.log('Add CIMUniqueValueSymbolizer')
+
         # get the field to render from
         stylesString = 'CLASSITEM          "' + root.findtext('./Symbolizer/Fields/String') + '"\n'
 
@@ -49,6 +53,8 @@ def getSymbology(root, geom):
             stylesString += '    END # class ' + value + '\n'
 
     elif 'CIMClassBreaksSymbolizer' in symbType:
+        trace.log('Add CIMClassBreaksSymbolizer')
+
         # get the field to render from
         field = root.findtext('./Symbolizer/Field')
         stylesString = 'CLASSITEM          "' + field + '"\n'

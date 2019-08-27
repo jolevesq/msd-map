@@ -5,6 +5,7 @@ from collections import OrderedDict
 import utils
 from common import lookup
 from common import sections
+from common import trace
 
 def manageSymbols(styles, values = OrderedDict()):
     """
@@ -31,6 +32,8 @@ def manageSymbols(styles, values = OrderedDict()):
 
         # circle
         if 'CIMSimpleMarker' in styleType:
+            trace.log('Create point: CIMSimpleMarker')
+
             values['OUTLINECOLOR'] = utils.getColor(style.find('./OutlineColor'))
             values['WIDTH'] = style.findtext('./OutlineWidth')
             values['COLOR'] = utils.getColor(style.find('./FillColor'))
@@ -39,13 +42,16 @@ def manageSymbols(styles, values = OrderedDict()):
             stylesString += utils.createStyle(values)
 
         elif 'CIMCharacterMarker' in styleType:
+            trace.log('Create point: CIMCharacterMarker')
             stylesString += manageCharacterMarkerSymbol(style, values)
 
         # square, cross, x, diamond
         elif 'CIMVectorMarker' in styleType:
+            trace.log('Create point: CIMVectorMarker')
             stylesString += manageVectorMarker(style, values)
 
         elif 'CIMPictureMarker' in styleType:
+            trace.log('Create point: CIMPictureMarker')
             name = utils.createPictureSymbol(style)
             values['SYMBOL'] = name
             stylesString += utils.createStyle(values)

@@ -7,6 +7,7 @@ import pointSymbols
 import lineSymbols
 from common import lookup
 from common import sections
+from common import trace
 
 def manageSymbols(styles):
     """
@@ -26,7 +27,12 @@ def manageSymbols(styles):
         styleType = item.attrib.itervalues().next()
 
         if 'CIMFilledStroke' in styleType:
-            values['OUTLINECOLOR'] = utils.getColor(item.find('./Pattern/Color'))
+            trace.log('Create outline')
+
+            # if a color is provided (we saw a case with a border but no color)
+            color = utils.getColor(item.find('./Pattern/Color'))
+            if (color != 'null null null'):
+                values['OUTLINECOLOR'] = color
             values['WIDTH'] = item.findtext('./Width')
             
             stylesString += utils.createStyle(values, ['OUTLINECOLOR', 'WIDTH'])
@@ -51,19 +57,23 @@ def getFill(node, values):
     pattern = node.find('./Pattern').attrib.itervalues().next()
 
     if 'CIMSolidPattern' in pattern:
+        trace.log('Create fill: CIMSolidPattern')
         values['COLOR'] = utils.getColor(node.find('./Pattern/Color'))
         style = utils.createStyle(values, ['COLOR'])
 
     elif 'CIMTiledPattern' in pattern:
+        trace.log('Create fill: CIMTiledPattern')
         name = utils.createPictureSymbol(node.find('./Pattern'))
         values['SYMBOL'] = name
         style = utils.createStyle(values)   
 
     elif 'CIMMarkerPattern' in pattern:
+        trace.log('Create fill: CIMMarkerPattern')
         values['GAP'] = node.findtext('./Pattern/MarkerPlacement/StepX')
         style = pointSymbols.manageSymbols(node.findall('./Pattern/Symbol/SymbolLayers/CIMSymbolLayer'), values)
 
     elif 'CIMHatchPattern' in pattern:
+        trace.log('Create fill: CIMHatchPattern')
         style = ''
         size = float(node.findtext('./Pattern/Separation'))
         
@@ -88,8 +98,10 @@ def getFill(node, values):
 
     elif 'CIMGradientPattern' in pattern:
         print 'CIMGradientPattern not supported for polygon layer'
+        trace.log('Create fill: CIMGradientPattern not supported for polygon layer')
 
     else:
         print pattern + ' is not supported for polygon layer'
+        trace.log('Create fill: ' + pattern + ' is not supported for polygon layer')
 
     return style

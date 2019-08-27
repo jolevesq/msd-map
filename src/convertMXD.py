@@ -18,17 +18,17 @@ from common import sections
 from common import trace
 
 print 'Argument List:', str(sys.argv)
-layersList = 'test'
-def loopLayers(fileName):
+def loopLayers(fileName,  layersArray):
     """
     Check if file is a layer or a group layers and add its name to array of layer
 
     Args:
         fileName: File name to read
+        layersArray: Arrays of layers object
+
+    Returns:
+        layersArray: Layers array .(will reverse to have the right order in the map file)
     """
-    global layersList
-    layersList += fileName
-    print fileName
     tree = ET.parse(msdZip.open(fileName))
     root = tree.getroot()
 
@@ -37,11 +37,13 @@ def loopLayers(fileName):
     # We can have groups in group so we always need to check.
     layersNode = root.find('./Layers')
     if layersNode == None:
-        layers.setLayer(root)
+        layersArray.append(root)
     else:
         for elem in layersNode.iter():
             if elem.text != None:
-                loopLayers(elem.text.split('=')[1])
+                loopLayers(elem.text.split('=')[1], layersArray)
+
+    return layersArray
 
 # set the MapServer folder
 sections.setProjectFolderName(sys.argv[3])
@@ -50,18 +52,32 @@ sections.setProjectFolderName(sys.argv[3])
 mxdFileFolder = sys.argv[1]
 mxdFilePath = sys.argv[1] + sys.argv[2]
 mxdFileName =  sys.argv[2]
-
-# get a reference to the Map Document
-mxd = arcpy.mapping.MapDocument(mxdFilePath)
-
-# create a map file with the same name of the MXD file, in the same folder
 mxdName = os.path.splitext(mxdFileName)[0]
-sections.createMapFile(mxdFileFolder + mxdName + '.map')
-
-# create trace file
-trace.createTraceFile(mxdFileFolder + mxdName + '_trace.txt')
 
 try:
+    # create trace file
+    trace.create(mxdFileFolder + mxdName + '_trace.txt')
+
+    # get a reference to the Map Document
+    mxd = arcpy.mapping.MapDocument(mxdFilePath)
+
+    # shorten layer names over 56 characters and uncompress FGDB data
+    layersMXD = arcpy.mapping.ListLayers(mxd)
+    for lyr in layersMXD:
+        if lyr.supports('workspacePath'):
+            sourcedata = lyr.workspacePath
+
+        if len(lyr.name) > 56:
+            truncName = lyr.name
+            lyr.name = lyr.name[:56]
+            trace.log('WARNING: The name of the layer \"' + truncName + '\" is too long and has been truncated to \"' + lyr.name + '\"')
+    arcpy.RefreshTOC()
+    if sourcedata[-4:] == '.gdb':
+        arcpy.UncompressFileGeodatabaseData_management(sourcedata)
+
+    # create a map file with the same name of the MXD file, in the same folder
+    sections.createMapFile(mxdFileFolder + mxdName + '.map')
+
     # convert to MSD (Map Service Definition)
     # TODO: we need to have the right data source path. if not, we need to repair the link
     arcpy.mapping.ConvertToMSD(mxd, mxdFileFolder + mxdName + '.msd')
@@ -76,12 +92,23 @@ try:
     sections.log('MAP')
     sections.getMap(docInfo, dataFrameInfo, epsg)
 
-    # add layers section
+    # create array of layers. We need to create an array then reverse it because the map file is the opposite order then the mxd
     layers.initLayers(epsg, sections.getProjectFolderName())
     layersNode = rootDataFrame.find('./Layers')
+    layersArray = []
     for elem in layersNode.iter():
         if elem.text != None:
-            loopLayers(elem.text.split('=')[1])
+            layersArray += loopLayers(elem.text.split('=')[1], [])
+
+    # get array of visible layers with their opacity value (use dataframe to know visibility and opacity)
+    display = dataFrameInfo['display']
+    display = [a for a in display if a['visibility'] == 'true']
+
+     # add layers section
+    layersArray.reverse()
+    layersName = []
+    for item in layersArray:
+        layersName.append(layers.setLayer(item, display))
 
     # add symbols section
     symbArr = sb.getSymbols()
@@ -90,16 +117,17 @@ try:
 
     sections.log('END # map')
 
-    # add url to use for testing to trace
-    global layersList
-    trace.setSampleUrl(mxdName + '.map', layersList)
+    # add url to use for testing to track
+    trace.setSampleUrl(mxdName + '.map', ','.join([a for a in layersName if a != '']))
 
-except:
-    print('except')
+except Exception as e:
+    message = 'Failed to create map file: ' + str(e)
+    print message
+    trace.log(message)
 
 finally:
     sections.closeMapFile()
-    trace.closeTraceFile()
+    trace.close()
 
     # clean
     del msdZip

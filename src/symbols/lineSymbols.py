@@ -5,6 +5,7 @@ from collections import OrderedDict
 import utils
 from common import lookup
 from common import sections
+from common import trace
 
 def manageSymbols(styles, values = OrderedDict(), fields = []):
     """
@@ -25,6 +26,8 @@ def manageSymbols(styles, values = OrderedDict(), fields = []):
         styleType = item.attrib.itervalues().next()
 
         if 'CIMFilledStroke' in styleType:
+            trace.log('Create line: CIMFilledStroke')
+
             fields.extend(['COLOR', 'WIDTH'])
             values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
             values['WIDTH'] = item.findtext('./Width')
@@ -39,12 +42,15 @@ def manageSymbols(styles, values = OrderedDict(), fields = []):
 
             stylesString += utils.createStyle(values, fields)
         elif 'CIMFill' in styleType:
+            trace.log('Create line: CIMFill')
+
             values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
             stylesString += utils.createStyle(values, ['COLOR'])
 
         elif 'CIMPlacedPointSymbols' in styleType:
             # hash line symbol
             print 'CIMPlacedPointSymbols (hash) not supported for line layer'
+            trace.log('Create line: CIMPlacedPointSymbols (hash) not supported for line layer')
         else:
             print styleType + ' not supported for line layer'
 

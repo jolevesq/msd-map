@@ -8,6 +8,7 @@ from io import BytesIO
 
 # import msd - map modules
 from common import sections
+from common import trace
 
 # array to hold all symbols to add to map file
 symbols = []
@@ -88,10 +89,11 @@ def getColor(node):
             B = int(255 * (100 - (y + k)) / 100)
 
     else:
+        trace.log('No color provided')
         # case where image is use as fill. Not supported in map file
-        R = 255
-        G = 255
-        B = 255
+        R = 'null'
+        G = 'null'
+        B = 'null'
 
     return str(R) + ' ' + str(G) + ' ' + str(B)
 

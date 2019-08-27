@@ -1,4 +1,5 @@
 import os
+import re
 
 # global variable for map file and project name
 mapFile = None
@@ -34,6 +35,22 @@ def log(txt, offset=0, upper=True):
         txt = txt.upper()
     
     mapFile.write(' ' * offset + txt + '\n')
+
+def replace(string, substitutions):
+    """
+    Replace multiple element in a string from a substitution object
+
+    Args:
+        string: String to replace element from
+        substitutions: Thing to replace e.g. { 'itemToReplace': 'replaceBy' }
+
+    Returns:
+        The replaced string
+    """
+
+    substrings = sorted(substitutions, key=len, reverse=True)
+    regex = re.compile('|'.join(map(re.escape, substrings)))
+    return regex.sub(lambda match: substitutions[match.group(0)], string)
 
 def setProjectFolderName(name):
     """
@@ -356,6 +373,13 @@ def getDataframeInfo(root):
         root.findtext('./DefaultExtent/XMax'),
         root.findtext('./DefaultExtent/YMax')]
 
+    props = root.findall('./MapLayerProperties/CIMMapLayerProperties')
+    values['display'] = []
+    for item in props:
+        values['display'].append({ 'transparency': item.findtext('./DefaultTransparency'),
+        'visibility': item.findtext('./DefaultVisibility'),
+        'layer': item.findtext('./LayerPath').split('/')[1].replace('.xml', '') })
+    
     return values
 
 def getSeparator():
