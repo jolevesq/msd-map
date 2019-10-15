@@ -4,6 +4,8 @@ import pointSymbols as pt
 import lineSymbols as ln
 import polygonSymbols as pl
 from common import trace
+from common import sections
+import labels
 
 def getSymbology(root, geom):
     """
@@ -21,13 +23,25 @@ def getSymbology(root, geom):
     """
     symbType = root.find('./Symbolizer').attrib.itervalues().next()
 
+    showLabels = root.findtext('./DisplayLabels')
+
+    stylesString = ''
+    subs = { '"': '', '+': '', '  ': ' ' }
     if 'CIMSimpleSymbolizer' in symbType:
         trace.log('Add CIMSimpleSymbolizer')
-        stylesString = 'CLASS\n'
+        stylesString += 'CLASS\n'
 
         # get array of symbols
         styles = root.findall('./Symbolizer/Symbol/Symbol/SymbolLayers/CIMSymbolLayer')
         stylesString += getStyle(styles, geom)
+
+         # get labels
+        if showLabels == 'true':
+            stylesString += 'TEXT          "' + sections.replace(root.findtext('./LabelClasses/CIMLabelClass/Expression'), subs) + '"\n'
+            stylesString += 'LABEL\n'
+            stylesString += '    COLOR 0 0 0'
+            stylesString += 'END\n'
+            #labels = lables.getLabels(root.find('./Symbolizer').attrib.itervalues().next())
 
         stylesString += '    END # class\n'
 
@@ -35,7 +49,7 @@ def getSymbology(root, geom):
         trace.log('Add CIMUniqueValueSymbolizer')
 
         # get the field to render from
-        stylesString = 'CLASSITEM          "' + root.findtext('./Symbolizer/Fields/String') + '"\n'
+        stylesString += 'CLASSITEM          "' + root.findtext('./Symbolizer/Fields/String') + '"\n'
 
         # get array of symbol class
         classes = root.findall('./Symbolizer/Groups/CIMUniqueValueGroup/Classes/CIMUniqueValueClass')
@@ -57,7 +71,7 @@ def getSymbology(root, geom):
 
         # get the field to render from
         field = root.findtext('./Symbolizer/Field')
-        stylesString = 'CLASSITEM          "' + field + '"\n'
+        stylesString += 'CLASSITEM          "' + field + '"\n'
         minimumBreak = root.findtext('./Symbolizer/MinimumBreak')
 
         # get array of symbol class

@@ -7,7 +7,7 @@ from common import lookup
 from common import sections
 from common import trace
 
-def manageSymbols(styles, values = OrderedDict(), fields = []):
+def manageSymbols(styles, values = OrderedDict([]), fields = []):
     """
     Create style for line layer
 
@@ -23,24 +23,37 @@ def manageSymbols(styles, values = OrderedDict(), fields = []):
     styles.reverse()
 
     for item in styles:
+        # copy original values and get type
+        oriValues = values.copy()
+        oriFields = list(fields)
         styleType = item.attrib.itervalues().next()
 
         if 'CIMFilledStroke' in styleType:
             trace.log('Create line: CIMFilledStroke')
 
-            fields.extend(['COLOR', 'WIDTH'])
-            values['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
-            values['WIDTH'] = item.findtext('./Width')
+            oriFields.extend(['COLOR', 'WIDTH'])
+            oriValues['COLOR'] = utils.getColor(item.find('./Pattern/Color'))
+            oriValues['WIDTH'] = item.findtext('./Width')
 
-            # efffects for cartographic line symbol
+            if item.find('./CapStyle') != None:
+                oriValues['LINECAP'] = item.findtext('./CapStyle').lower()
+                oriFields.append('LINECAP')
+            if item.find('./JoinStyle') != None:
+                oriValues['LINEJOIN'] = item.findtext('./JoinStyle').lower()
+                oriFields.append('LINEJOIN')
+            if item.find('./MiterLimit') != None:
+                oriValues['LINEJOINMAXSIZE'] = item.findtext('./MiterLimit').lower()
+                oriFields.append('LINEJOINMAXSIZE')
+
+            # effects for cartographic line symbol
             effects = item.find('./Effects')
             pattern = ''
             if effects != None:
                 pattern = createEffects(effects)
-                values['PATTERN'] = pattern
-                fields.append('PATTERN')
+                oriValues['PATTERN'] = pattern
+                oriFields.append('PATTERN')
 
-            stylesString += utils.createStyle(values, fields)
+            stylesString += utils.createStyle(oriValues, oriFields)
         elif 'CIMFill' in styleType:
             trace.log('Create line: CIMFill')
 

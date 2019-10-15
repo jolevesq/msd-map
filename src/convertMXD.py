@@ -128,6 +128,7 @@ except Exception as e:
 finally:
     sections.closeMapFile()
     trace.close()
+    print 'End of Map file creation'
 
     # clean
     del msdZip

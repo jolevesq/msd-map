@@ -1,0 +1,2 @@
+def getLabels():
+    print 'label'

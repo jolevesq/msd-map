@@ -34,7 +34,9 @@ def manageSymbols(styles, values = OrderedDict()):
         if 'CIMSimpleMarker' in styleType:
             trace.log('Create point: CIMSimpleMarker')
 
-            values['OUTLINECOLOR'] = utils.getColor(style.find('./OutlineColor'))
+            color = utils.getColor(style.find('./OutlineColor'))
+            if (color != 'null null null'):
+                values['OUTLINECOLOR'] = color
             values['WIDTH'] = style.findtext('./OutlineWidth')
             values['COLOR'] = utils.getColor(style.find('./FillColor'))
             values['SIZE'] = style.findtext('./Size')

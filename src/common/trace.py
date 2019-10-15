@@ -40,6 +40,6 @@ def setSampleUrl(mapFile, layers):
     """
     url = """***ReplaceByMapServer***?map=/home/ubuntu/wms/{mapFile}&layers={layers}
 &VERSION=1.1.1&FORMAT=application/openlayers&SERVICE=WMS&REQUEST=GetMap&SRS=EPSG%3A3978
-&BBOX=-4482582.4653087063,-1201458.0209611938,4333351.8332265588,6429140.5735693295&WIDTH=1600&HEIGHT=800""".format(mapFile=mapFile, layers=layers)
+&BBOX=-4482582,-1201458,4333351,6429140&WIDTH=1600&HEIGHT=800""".format(mapFile=mapFile, layers=layers)
 
-    log('URL: ' + url.replace('\n', ''))
+    log('\nURL: ' + url.replace('\n', '') + '\n')
